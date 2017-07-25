@@ -1,19 +1,29 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, div, img)
-import Html.Attributes exposing (src)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onInput)
 
 
+{-
+   main =
+       Html.beginnerProgram { model = model, view = view, update = update }
+-}
 ---- MODEL ----
 
 
 type alias Model =
-    {}
+    { search : String }
+
+
+model : Model
+model =
+    Model ""
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( {}, Cmd.none )
+    ( Model "", Cmd.none )
 
 
 
@@ -21,12 +31,14 @@ init =
 
 
 type Msg
-    = NoOp
+    = Search String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        Search search ->
+            ( { model | search = search }, Cmd.none )
 
 
 
@@ -36,16 +48,16 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ img [ src "/logo.svg" ] []
-        , div [] [ text "Your Elm App is working!" ]
+        [ text "Search users names: "
+        , input [ onInput Search ] []
         ]
 
 
 
 ---- PROGRAM ----
+--   main : Program Never Model Msg
 
 
-main : Program Never Model Msg
 main =
     Html.program
         { view = view
