@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onInput)
+import Html.Events exposing (onInput, onClick)
 
 
 {-
@@ -32,6 +32,7 @@ init =
 
 type Msg
     = Search String
+    | Submit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -39,6 +40,9 @@ update msg model =
     case msg of
         Search search ->
             ( { model | search = search }, Cmd.none )
+
+        Submit ->
+            ( model, Cmd.none )
 
 
 
@@ -50,6 +54,8 @@ view model =
     div []
         [ text "Search users names: "
         , input [ onInput Search ] []
+        , div [] []
+        , button [ onClick Submit ] [ text "Submit" ]
         ]
 
 
