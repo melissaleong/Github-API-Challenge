@@ -15,47 +15,61 @@ import Json.Decode as JD
 type alias User =
     { name : String
     , avatar_url : String
+    , repositories : String
     }
 
 
-decodeData : JD.Decoder User
-decodeData =
-    JD.map2 User
+decodeUser : JD.Decoder User
+decodeUser =
+    JD.map3 User
         (JD.field "login" JD.string)
         (JD.field "avatar_url" JD.string)
+        (JD.field "repos_url" JD.string)
 
 
-getData : Http.Request User
-getData =
-    Http.get "https://api.github.com/users" decodeData
+decodeList : JD.Decoder (List User)
+decodeList =
+    JD.list decodeUser
 
 
+getData : String -> Http.Request (List User)
+getData search =
+    Http.get (createLink search) (JD.field "items" decodeList)
 
---type AMsg
---    = LoadData (Result Http.Error User)
+
+send : String -> Cmd Msg
+send search =
+    Http.send LoadData (getData search)
 
 
-send : Cmd Msg
-send =
-    Http.send LoadData getData
+createLink : String -> String
+createLink search =
+    String.concat [ "https://api.github.com/search/users?q=", search ]
+
+
+toImages : List User -> List String
+toImages list =
+    List.map .avatar_url list
 
 
 type alias Model =
     { search : String
-    , hidden : Bool
-    , user : String -> String -> User
-    , image : String
+    , users : List User
+    , images : List String
     }
 
 
-model : Model
-model =
-    Model "" True User ""
+initModel : Model
+initModel =
+    { search = ""
+    , users = []
+    , images = []
+    }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( Model "" True User "", Cmd.none )
+    ( initModel, Cmd.none )
 
 
 
@@ -65,7 +79,7 @@ init =
 type Msg
     = Search String
     | Submit
-    | LoadData (Result Http.Error User)
+    | LoadData (Result Http.Error (List User))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -75,15 +89,17 @@ update msg model =
             ( { model | search = search }, Cmd.none )
 
         Submit ->
-            ( { model | hidden = False }, send )
+            ( model, send model.search )
 
-        LoadData (Ok user) ->
-            ( { model | image = "https://avatars0.githubusercontent.com/u/1?v=4" }
-            , Cmd.none
-            )
+        LoadData (Ok users) ->
+            ( { model | users = users }, Cmd.none )
 
-        LoadData (Err _) ->
-            ( model, Cmd.none )
+        LoadData (Err something) ->
+            let
+                _ =
+                    Debug.log "" something
+            in
+                ( model, Cmd.none )
 
 
 
@@ -97,9 +113,21 @@ view model =
         , input [ type_ "search", onInput Search ] []
         , div [] []
         , button [ onClick Submit ] [ text "SUBMIT" ]
-        , div [] []
-        , img [ src model.image ] []
+        , div [] [ text model.search ]
+        , viewImageList model.users
         ]
+
+
+viewImage : User -> Html Msg
+viewImage { name, avatar_url, repositories } =
+    img [ src avatar_url ] []
+
+
+viewImageList : List User -> Html Msg
+viewImageList userList =
+    userList
+        |> List.map viewImage
+        |> div []
 
 
 
