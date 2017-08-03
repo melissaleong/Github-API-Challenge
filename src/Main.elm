@@ -5,9 +5,9 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
 import Json.Decode as JD
+import Json.Decode.Pipeline as JDP
 
 
--- import Json.Decode.Pipeline as JDP
 --import Json.Decode as Json exposing (..)
 ---- MODEL ----
 
@@ -62,11 +62,11 @@ type alias RepoInfo =
 
 decodeRepo : JD.Decoder RepoInfo
 decodeRepo =
-    JD.map4 RepoInfo
-        (JD.field "name" JD.string)
-        (JD.field "language" JD.string)
-        (JD.field "watchers" JD.int)
-        (JD.field "url" JD.string)
+    JDP.decode RepoInfo
+        |> JDP.required "name" JD.string
+        |> JDP.optional "language" JD.string ""
+        |> JDP.required "watchers" JD.int
+        |> JDP.required "url" JD.string
 
 
 decodeRepoList : JD.Decoder (List RepoInfo)
@@ -89,6 +89,7 @@ type alias Model =
     , users : List User
     , images : List String
     , userRepos : List RepoInfo
+    , userName : String
     }
 
 
@@ -98,6 +99,7 @@ initModel =
     , users = []
     , images = []
     , userRepos = []
+    , userName = "User"
     }
 
 
@@ -114,7 +116,7 @@ type Msg
     = Search String
     | Submit
     | LoadData (Result Http.Error (List User))
-    | ChooseUser String
+    | ChooseUser String String
     | LoadRepoData (Result Http.Error (List RepoInfo))
 
 
@@ -137,8 +139,8 @@ update msg model =
             in
                 ( model, Cmd.none )
 
-        ChooseUser repositories ->
-            ( model, sendRepo repositories )
+        ChooseUser repositories userName ->
+            ( { model | userName = userName }, sendRepo repositories )
 
         LoadRepoData (Ok userRepos) ->
             ( { model | userRepos = userRepos }, Cmd.none )
@@ -162,19 +164,15 @@ view model =
         , input [ type_ "search", onInput Search ] []
         , div [] []
         , button [ onClick Submit ] [ text "SUBMIT" ]
-        , div [] [ text model.search ]
         , viewImageList model.users
-
-        --        , a [ href "https://api.github.com/users/omegaphoenix/repos" ]
-        --            [ img [ src "https://avatars2.githubusercontent.com/u/10361461?v=4" ] []
-        --            ]
+        , div [] [ h2 [] [ text (model.userName ++ "'s repositories") ] ]
         , viewRepoList model.userRepos
         ]
 
 
 viewImage : User -> Html Msg
 viewImage { name, avatar_url, repositories } =
-    button [ onClick (ChooseUser repositories) ]
+    button [ onClick (ChooseUser repositories name) ]
         [ img [ src avatar_url ] [] ]
 
 
@@ -188,10 +186,9 @@ viewImageList userList =
 viewRepo : RepoInfo -> Html Msg
 viewRepo { name, language, watchers, url } =
     div []
-        [ a [ href url ] [ h2 [] [ text name ] ]
-        , div [] [ text "Primary Language: " ]
-        , text language
-        , div [] [ text "Watchers: " ]
+        [ a [ href url ] [ h3 [] [ text name ] ]
+        , div [] [ text ("Primary Language: " ++ language) ]
+        , div [] [ text ("Watchers: " ++ (viewWatchers watchers)) ]
         ]
 
 
@@ -200,6 +197,24 @@ viewRepoList repoList =
     repoList
         |> List.map viewRepo
         |> div []
+
+
+viewWatchers : Int -> String
+viewWatchers watchers =
+    if watchers == 0 then
+        "None"
+    else
+        viewNumWatchers watchers
+
+
+viewNumWatchers : Int -> String
+viewNumWatchers watchers =
+    case watchers of
+        0 ->
+            ""
+
+        n ->
+            "😀" ++ (viewNumWatchers (n - 1))
 
 
 
