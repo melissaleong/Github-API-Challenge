@@ -37,8 +37,8 @@ getData search =
     Http.get (createLink search) (JD.field "items" decodeList)
 
 
-send : String -> Cmd Msg
-send search =
+sendUser : String -> Cmd Msg
+sendUser search =
     Http.send LoadData (getData search)
 
 
@@ -52,10 +52,43 @@ toImages list =
     List.map .avatar_url list
 
 
+type alias RepoInfo =
+    { name : String
+    , language : String
+    , watchers : Int
+    , url : String
+    }
+
+
+decodeRepo : JD.Decoder RepoInfo
+decodeRepo =
+    JD.map4 RepoInfo
+        (JD.field "name" JD.string)
+        (JD.field "language" JD.string)
+        (JD.field "watchers" JD.int)
+        (JD.field "url" JD.string)
+
+
+decodeRepoList : JD.Decoder (List RepoInfo)
+decodeRepoList =
+    JD.list decodeRepo
+
+
+getRepoData : String -> Http.Request (List RepoInfo)
+getRepoData repoLink =
+    Http.get (repoLink) (decodeRepoList)
+
+
+sendRepo : String -> Cmd Msg
+sendRepo repoLink =
+    Http.send LoadRepoData (getRepoData repoLink)
+
+
 type alias Model =
     { search : String
     , users : List User
     , images : List String
+    , userRepos : List RepoInfo
     }
 
 
@@ -64,6 +97,7 @@ initModel =
     { search = ""
     , users = []
     , images = []
+    , userRepos = []
     }
 
 
@@ -80,6 +114,8 @@ type Msg
     = Search String
     | Submit
     | LoadData (Result Http.Error (List User))
+    | ChooseUser String
+    | LoadRepoData (Result Http.Error (List RepoInfo))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -89,12 +125,25 @@ update msg model =
             ( { model | search = search }, Cmd.none )
 
         Submit ->
-            ( model, send model.search )
+            ( model, sendUser model.search )
 
         LoadData (Ok users) ->
             ( { model | users = users }, Cmd.none )
 
         LoadData (Err something) ->
+            let
+                _ =
+                    Debug.log "" something
+            in
+                ( model, Cmd.none )
+
+        ChooseUser repositories ->
+            ( model, sendRepo repositories )
+
+        LoadRepoData (Ok userRepos) ->
+            ( { model | userRepos = userRepos }, Cmd.none )
+
+        LoadRepoData (Err something) ->
             let
                 _ =
                     Debug.log "" something
@@ -115,18 +164,41 @@ view model =
         , button [ onClick Submit ] [ text "SUBMIT" ]
         , div [] [ text model.search ]
         , viewImageList model.users
+
+        --        , a [ href "https://api.github.com/users/omegaphoenix/repos" ]
+        --            [ img [ src "https://avatars2.githubusercontent.com/u/10361461?v=4" ] []
+        --            ]
+        , viewRepoList model.userRepos
         ]
 
 
 viewImage : User -> Html Msg
 viewImage { name, avatar_url, repositories } =
-    img [ src avatar_url ] []
+    button [ onClick (ChooseUser repositories) ]
+        [ img [ src avatar_url ] [] ]
 
 
 viewImageList : List User -> Html Msg
 viewImageList userList =
     userList
         |> List.map viewImage
+        |> div []
+
+
+viewRepo : RepoInfo -> Html Msg
+viewRepo { name, language, watchers, url } =
+    div []
+        [ a [ href url ] [ h2 [] [ text name ] ]
+        , div [] [ text "Primary Language: " ]
+        , text language
+        , div [] [ text "Watchers: " ]
+        ]
+
+
+viewRepoList : List RepoInfo -> Html Msg
+viewRepoList repoList =
+    repoList
+        |> List.map viewRepo
         |> div []
 
 
